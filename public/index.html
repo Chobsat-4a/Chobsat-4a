@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat 💀</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h2>💀 Chat 💀</h2>
+    </div>
+
+    <div id="chat" class="chat-messages"></div>
+
+    <div class="input-area">
+      <input type="file" id="fileInput" class="file-input" onchange="sendFile(event)" accept="image/*,audio/*,*" />
+      <label for="fileInput" class="attach-btn">+</label>
+
+      <input id="msg" class="message-input" placeholder="Digite uma mensagem..." autocomplete="off" />
+      <button onclick="sendMessage()" class="send-btn">→</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const chat = document.getElementById('chat');
+    const mySocketId = socket.id; // será atualizado após connect
+
+    socket.on('connect', () => {
+      console.log('Conectado com ID:', socket.id);
+    });
+
+    socket.on('chatMessage', (data) => {
+      addMessage(data.text, data.sender === socket.id, data.time);
+    });
+
+    socket.on('fileUpload', (data) => {
+      addFileMessage(data, data.sender === socket.id);
+    });
+
+    function sendMessage() {
+      const input = document.getElementById('msg');
+      const text = input.value.trim();
+      if (!text) return;
+
+      socket.emit('chatMessage', text);
+      input.value = '';
+      input.focus();
+    }
+
+    function sendFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        socket.emit('fileUpload', {
+          name: file.name,
+          type: file.type,
+          url: reader.result
+        });
+      };
+      reader.readAsDataURL(file);
+      event.target.value = ''; // limpa input file
+    }
+
+    function addMessage(text, isOwn, time = 'Agora') {
+      const div = document.createElement('div');
+      div.className = `message ${isOwn ? 'sent' : 'received'}`;
+      div.innerHTML = `
+        <div class="bubble">${text}</div>
+        <span class="time">${time}</span>
+      `;
+      chat.appendChild(div);
+      chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
+    }
+
+    function addFileMessage(fileData, isOwn) {
+      const div = document.createElement('div');
+      div.className = `message ${isOwn ? 'sent' : 'received'} file-msg`;
+
+      let content = '';
+      if (fileData.type.startsWith('image/')) {
+        content = `<img src="${fileData.url}" alt="${fileData.name}" class="chat-image" />`;
+      } else if (fileData.type.startsWith('audio/')) {
+        content = `
+          <div class="voice-message">
+            <div class="waveform"></div>
+            <button class="play-btn">▶</button>
+            <span class="duration">~${Math.floor(Math.random()*3)+1}:${Math.floor(Math.random()*60).toString().padStart(2,'0')}</span>
+          </div>
+        `;
+      } else {
+        content = `<a href="${fileData.url}" target="_blank" class="file-link">📎 ${fileData.name}</a>`;
+      }
+
+      div.innerHTML = `
+        ${content}
+        <span class="time">${fileData.time || 'Agora'}</span>
+      `;
+      chat.appendChild(div);
+      chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
+    }
+
+    // Para testar visualmente (remova depois)
+    // addMessage('Oi, tudo bem?', false, '02:15');
+    // addMessage('Tudo sim e contigo?', true, '02:16');
+  </script>
+</body>
+</html>
